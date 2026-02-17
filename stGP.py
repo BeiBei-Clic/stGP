@@ -212,7 +212,7 @@ def evaluate_individual(individual, toolbox, X_train, y_train):
     
     return rmse,
 
-def run_genetic_programming(dataset_name, sample_size=1000, population_size=200, generations=300, random_seed=42):
+def run_genetic_programming(dataset_name, sample_size=1000, population_size=300, generations=100, random_seed=42):
     """运行遗传编程算法"""
     print(f"开始遗传编程算法... 数据集: {dataset_name}, 随机种子: {random_seed}")
     
@@ -307,19 +307,6 @@ def run_multiple_experiments(dataset_name, sample_size=1000, population_size=200
     
     # 计算统计信息
     test_rmses = [r['test_rmse'] for r in results]
-    test_rmses.sort()
-    
-    # 计算分位数
-    q25_idx = int(0.25 * len(test_rmses))
-    q50_idx = int(0.50 * len(test_rmses))
-    q75_idx = int(0.75 * len(test_rmses))
-    
-    # 获取对应分位数的结果
-    selected_results = {
-        'q25': results[test_rmses.index(test_rmses[q25_idx])],
-        'q50': results[test_rmses.index(test_rmses[q50_idx])],
-        'q75': results[test_rmses.index(test_rmses[q75_idx])]
-    }
     
     # 添加统计信息
     stats = {
@@ -332,17 +319,14 @@ def run_multiple_experiments(dataset_name, sample_size=1000, population_size=200
             'mean': np.mean(test_rmses),
             'std': np.std(test_rmses),
             'min': np.min(test_rmses),
-            'max': np.max(test_rmses),
-            'q25': test_rmses[q25_idx],
-            'q50': test_rmses[q50_idx],
-            'q75': test_rmses[q75_idx]
+            'max': np.max(test_rmses)
         },
-        'selected_results': selected_results
+        'all_results': results
     }
     
     print(f"\n数据集 {dataset_name} 实验完成:")
     print(f"测试RMSE - 平均值: {stats['test_rmse_stats']['mean']:.6f}, 标准差: {stats['test_rmse_stats']['std']:.6f}")
-    print(f"分位数 - 25%: {stats['test_rmse_stats']['q25']:.6f}, 50%: {stats['test_rmse_stats']['q50']:.6f}, 75%: {stats['test_rmse_stats']['q75']:.6f}")
+    print(f"最小值: {stats['test_rmse_stats']['min']:.6f}, 最大值: {stats['test_rmse_stats']['max']:.6f}")
     
     return stats
 
@@ -351,22 +335,22 @@ def save_results(results, dataset_name):
     os.makedirs('/home/xyh/stGP/results', exist_ok=True)
     
     # 保存详细结果
-    filename = f'/home/xyh/stGP/results/{dataset_name}_results.json'
+    filename = f'/home/xyh/stGP/results/{dataset_name}.json'
     with open(filename, 'w', encoding='utf-8') as f:
         # 处理logbook对象，转换为可序列化的格式
         results_copy = results.copy()
-        for key in ['q25', 'q50', 'q75']:
-            if 'logbook' in results_copy['selected_results'][key]:
-                logbook = results_copy['selected_results'][key]['logbook']
+        for i, result in enumerate(results_copy['all_results']):
+            if 'logbook' in result:
+                logbook = result['logbook']
                 # 只保存每一代的最佳适应度（最小值），不再保存generations字段
-                results_copy['selected_results'][key]['logbook'] = {
+                results_copy['all_results'][i]['logbook'] = {
                     'best_fitness': [record['min'] for record in logbook]
                 }
         
         json.dump(results_copy, f, indent=2, ensure_ascii=False)
     
     print(f"结果已保存到: {filename}")
-    print(f"已保存三次实验的每代最佳适应度变化过程 (25%、50%、75%分位数)，不包含generations字段")
+    print(f"已保存全部 {len(results['all_results'])} 次实验的每代最佳适应度变化过程，不包含generations字段")
 
 def main(sample_size=1000, population_size=200, generations=300):
     """主函数，运行所有数据集的实验"""
@@ -409,7 +393,7 @@ def main(sample_size=1000, population_size=200, generations=300):
     for dataset, results in all_results.items():
         stats = results['test_rmse_stats']
         print(f"{dataset}: 平均RMSE={stats['mean']:.6f} (±{stats['std']:.6f}), "
-              f"分位数[{stats['q25']:.6f}, {stats['q50']:.6f}, {stats['q75']:.6f}]")
+              f"范围[{stats['min']:.6f}, {stats['max']:.6f}]")
     
     return all_results
 
@@ -417,6 +401,6 @@ if __name__ == "__main__":
     # 可以通过修改这些参数来调试不同的超参数设置
     results = main(
         sample_size=100,    # 每个数据集使用的样本数
-        population_size=200, # 种群个体数
-        generations=300      # 迭代代数
+        population_size=300, # 种群个体数
+        generations=200      # 迭代代数
     )
